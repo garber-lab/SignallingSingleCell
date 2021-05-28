@@ -1,19 +1,20 @@
 #' plot_violin
 #' @description Create violin plot.
-#' @param input Bioconductor’s ExpressionSet Class with unlogged values in exprs().
+#' @param input Bioconductor’s ExpressionSet Class with (not log) values in exprs().
 #' @param title Title of the graph. Would be the gene name if not specificed.
 #' @param gene to plot the expression level of.
 #' @param color_by a pData variable.
 #' @param log_scale If true, transform UMIs by log2(UMI + 1).
-#' @param colors What colors to utilize for categorial data. Be sure it is of the proper length.
+#' @param colors What colors to utilize for categorical data. Be sure it is of the proper length.
 #' @param facet_by a vector with one or two pData variables. If two, the first variable as columns and the second as rows.
-#' @param spread e.g. Healthy catagory is unique in Disease and Skin. To use Healthy only as skin but not Disease, that is adding Healthy skin to each disease, spread = c("Disease", "Healthy").
-#' @param text_sizes a vector of title_size, axis_title, axis_text, legend_title, legend_text, facet_text, faults too c(20,10,5,10,5,5)
+#' @param spread e.g. Healthy category is unique in Disease and Skin. To use Healthy only as skin but not Disease, that is adding Healthy skin to each disease, spread = c("Disease", "Healthy").
+#' @param text_sizes a vector of title_size, axis_title, axis_text, legend_title, legend_text, facet_text, number_label_text_size, defaults too c(20,10,5,10,5,5,2)
 #' @param theme the plot theme. Default to be "classic" if not set to "bw".
 #' @param number_labels show the total cell numbers and cell fraction with non-zero expression values under each bar.
 #' @param plot_mean plot the mean value as black dot with second y-axis on the right.
 #' @param size the size of dots.
 #' @param sig the number of digits after the decimal point for cell fraction value.
+#' @param contour_line_width the thickness of the violin contour line
 #' @details
 #' Utilize information stored in pData to control the plot display. Each point_by as a dot with a bar showing the weighted mean of all point_by dots.
 #' @examples
@@ -22,8 +23,9 @@
 #' @export
 plot_violin <- function (input, title = "", gene, color_by, log_scale = F,
                           colors = NULL, facet_by = NULL, spread = NULL, jitter_pts = T,
-                          plot_mean = T, size = 1, sig = 3, number_labels = T,
-                          text_sizes = c(20, 10, 5, 10, 5, 5), alpha = 0.5, theme = "classic")
+                          plot_mean = T, plot_mean_dot_size = 2, size = 1, sig = 3, number_labels = T,
+                          text_sizes = c(20, 10, 5, 10, 5, 5, 2), alpha = 0.5, theme = "classic",
+                          contour_line_width = 0.3)
 {
   df <- pData(input)[, colnames(pData(input)) %in% c(gene, color_by, facet_by), drop = F]
   df <- cbind(df, raw=exprs(input)[gene, ])
@@ -65,16 +67,16 @@ plot_violin <- function (input, title = "", gene, color_by, log_scale = F,
   g <- g + theme(legend.position = "bottom", plot.title = element_text(hjust = 0.5),axis.title.x = element_blank(), axis.text.x = element_blank(),
                  axis.ticks.x = element_blank())
   if (jitter_pts == T) g <- g + geom_jitter(aes_string(x = color_by, y = "plot", col = color_by), width = 0.2, size = size)
-  g <- g + geom_violin(aes_string(x = color_by, y = "plot", fill = color_by), col = "black", trim = T, scale = "width", alpha = alpha)
+  g <- g + geom_violin(aes_string(x = color_by, y = "plot", fill = color_by), col = "black", trim = T, scale = "width", alpha = alpha, size=contour_line_width) 
   if (number_labels == T) {
     g <- g + stat_summary(aes_string(x = color_by, y = "raw"), fun.data = function(x) {return(c(y = -max(df$plot)/25, label = length(x)))}, colour = "black",
-                          geom = "text", size = 2)
+                          geom = "text", size = text_sizes[7])
     g <- g + stat_summary(aes_string(x = color_by, y = "raw"), fun.data = function(x) {return(c(y = -max(df$plot)/10, label = round(mean(as.numeric(x > 0)), sig)))}, colour = "black",
-                          geom = "text", size = 2)
+                          geom = "text", size = text_sizes[7])
   }
   if (plot_mean == TRUE) {
     scale <- max(df$plot)/max(tapply(df$raw, INDEX = as.list(df[, colnames(df) %in% c(color_by, facet_by), drop = F]), FUN=mean), na.rm = T)
-    g <- g + suppressWarnings(stat_summary(aes_string(x = color_by, y = "raw"), fun.y = function(x) mean(x)*(scale * 0.5), colour = "black", geom = "point", size = 2))
+    g <- g + suppressWarnings(stat_summary(aes_string(x = color_by, y = "raw"), fun.y = function(x) mean(x)*(scale * 0.5), colour = "black", geom = "point", size = plot_mean_dot_size))
     g <- g + scale_y_continuous(sec.axis = sec_axis(~./(scale * 0.5), name = "Mean Expression"))
   }
   if (length(facet_by) == 1) {
